@@ -15,3 +15,14 @@ class Board:
         self.grid = grid
         self.lasers = lasers
         self.targets = targets # List of target points
+    
+    def place_block(self, block, x, y):
+        if not self.grid[y][x].fixed:
+            self.grid[y][x] = block
+
+    def remove_block(self, x, y):
+        if not self.grid[y][x].fixed:
+            self.grid[y][x] = Block('empty')
+
+    def withIn_bounds(self, x, y):
+        return 0 <= x < len(self.grid[0]) and 0 <= y < len(self.grid)
