@@ -82,15 +82,27 @@ class Laser:
         '''
         self.vy = -self.vy
 
-    def refract(self):
+    def refract_x(self):
         '''
-        Generates a new Laser object to represent the refracted laser.
+        Generates a new Laser object with the x-component of the direction vector reversed.
 
         Returns:
             Laser: 
-                A new laser with the same position and opposite direction vector.
+                A new laser with the same position and
+                the x-component of the direction vector reversed.
         '''
-        return Laser(self.x, self.y, -self.vx, -self.vy)
+        return Laser(self.x, self.y, -self.vx, self.vy)
+
+    def refract_y(self):
+        '''
+        Generates a new Laser object with the y-component of the direction vector reversed.
+
+        Returns:
+            Laser: 
+                A new laser with the same position and
+                the y-component of the direction vector reversed.
+        '''
+        return Laser(self.x, self.y, self.vx, -self.vy)
     
     def absorb(self):
         '''
