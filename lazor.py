@@ -3,9 +3,9 @@ class Block:
     A class representing a block in the Lazors game grid.
 
     Attributes:
-        block_type (str): 
+        block_type (str):
             The type of the block ('reflect', 'opaque', 'refract', 'empty').
-        fixed (bool): 
+        fixed (bool):
             Whether the block is fixed in position (True) or movable (False).
     '''
 
@@ -14,27 +14,48 @@ class Block:
         Initializes a Block instance with a specified type and fixed status.
 
         Args:
-            block_type (str): 
+            block_type (str):
                 Type of the block ('reflect', 'opaque', 'refract', 'empty').
-            fixed (bool, optional): 
-                If True, the block is fixed in place. Otherwise, it is movable. 
+            fixed (bool, optional):
+                If True, the block is fixed in place. Otherwise, it is movable.
                 Default is False.
         '''
         self.block_type = block_type  # 'reflect', 'opaque', 'refract', 'empty'
         self.fixed = fixed
+
+    def is_empty(self):
+        '''
+        Checks if the block is an empty, movable position.
+
+        Returns:
+            bool:
+                True if the block is empty and movable, False otherwise.
+        '''
+        return self.block_type == 'empty' and not self.fixed
+
+    def can_interact_with_laser(self):
+        '''
+        Determines if the block can interact with a laser.
+
+        Returns:
+            bool:
+                True if the block is 'reflect', 'opaque', or 'refract', False otherwise.
+        '''
+        return self.block_type in ('reflect', 'opaque', 'refract')
+
 
 class Laser:
     '''
     A class representing a laser in the Lazors game.
 
     Attributes:
-        x (int): 
+        x (int):
             The x-coordinate of the laser's starting position.
-        y (int): 
+        y (int):
             The y-coordinate of the laser's starting position.
-        vx (int): 
+        vx (int):
             The x-component of the laser's direction vector (can be 0, 1 or -1).
-        vy (int): 
+        vy (int):
             The y-component of the laser's direction vector (can be 0, 1 or -1).
     '''
 
@@ -43,13 +64,13 @@ class Laser:
         Initializes a Laser instance with a starting position and direction vector.
 
         Args:
-            x (int): 
+            x (int):
                 The x-coordinate of the laser's starting position.
-            y (int): 
+            y (int):
                 The y-coordinate of the laser's starting position.
-            vx (int): 
+            vx (int):
                 The x-component of the laser's direction vector (0, 1 or -1).
-            vy (int): 
+            vy (int):
                 The y-component of the laser's direction vector (0,1 or -1).
         '''
         self.x = x
@@ -87,7 +108,7 @@ class Laser:
         Generates a new Laser object with the x-component of the direction vector reversed.
 
         Returns:
-            Laser: 
+            Laser:
                 A new laser with the same position and
                 the x-component of the direction vector reversed.
         '''
@@ -98,12 +119,12 @@ class Laser:
         Generates a new Laser object with the y-component of the direction vector reversed.
 
         Returns:
-            Laser: 
+            Laser:
                 A new laser with the same position and
                 the y-component of the direction vector reversed.
         '''
         return Laser(self.x, self.y, self.vx, -self.vy)
-    
+
     def absorb(self):
         '''
         Terminates the laser's movement by setting its direction to (0, 0).
@@ -119,26 +140,84 @@ class Laser:
         '''
         return (self.x, self.y)
 
-class Board:
-    def __init__(self, grid, lasers, targets):
-        self.grid = grid
-        self.lasers = lasers
-        self.targets = targets # List of target points
-    
-    def place_block(self, block, x, y):
-        if not self.grid[y][x].fixed:
-            self.grid[y][x] = block
 
-    def remove_block(self, x, y):
-        if not self.grid[y][x].fixed:
-            self.grid[y][x] = Block('empty')
+class Grid:
+    '''
+    A class representing the game grid in the Lazors game.
+
+    Attributes:
+        grid (list):
+            A 2D list of Block objects representing the grid layout.
+    '''
+
+    def __init__(self, grid):
+        '''
+        Initializes a Grid instance with a specified grid layout.
+
+        Args:
+            grid (list): A 2D list containing Block objects that define the initial grid layout.
+        '''
+        self.grid = grid
+
+    def set_block(self, x, y, block):
+        '''
+        Places a block at a specific position in the grid.
+
+        Args:
+            x (int): The x-coordinate of the block position.
+            y (int): The y-coordinate of the block position.
+            block (Block): The block object to place at the specified position.
+        '''
+        self.grid[y][x] = block
+
+    def get_block(self, x, y):
+        '''
+        Retrieves the block at a specific position in the grid.
+
+        Args:
+            x (int): The x-coordinate of the block position.
+            y (int): The y-coordinate of the block position.
+
+        Returns:
+            Block: The block at the specified position.
+        '''
+        return self.grid[y][x]
 
     def is_within_bounds(self, x, y):
+        '''
+        Checks if the specified position is within the grid boundaries.
+
+        Args:
+            x (int):
+                The x-coordinate to check.
+            y (int):
+                The y-coordinate to check.
+
+        Returns:
+            bool:
+                True if the position is within bounds, False otherwise.
+        '''
         return 0 <= x < len(self.grid[0]) and 0 <= y < len(self.grid)
+
+    def find_empty_positions(self):
+        '''
+        Finds all empty, movable positions in the grid.
+
+        Returns:
+            empty_positions (list):
+                List of (x, y) positions that are empty and can hold a block.
+        '''
+        empty_positions = []
+        for y in range(len(self.grid)):
+            for x in range(len(self.grid[0])):
+                if self.get_block(x, y).is_empty():
+                    empty_positions.append((x, y))
+        return empty_positions
+
 
 def read_bff_file(file_path):
     '''
-    This function opens and parses a .bff file line by line, 
+    This function opens and parses a .bff file line by line,
     getting all the information and storing them in a dictionary.
 
     Args:
@@ -173,15 +252,19 @@ def read_bff_file(file_path):
                 row = []
                 for char in line:
                     if char == 'x':
-                        row.append(Block('none', fixed=True))  # No block allowed
+                        # No block allowed
+                        row.append(Block('none', fixed=True))
                     elif char == 'o':
                         row.append(Block('empty'))  # Block allowed
                     elif char == 'A':
-                        row.append(Block('reflect', fixed=True))  # Fixed reflect block
+                        # Fixed reflect block
+                        row.append(Block('reflect', fixed=True))
                     elif char == 'B':
-                        row.append(Block('opaque', fixed=True))  # Fixed opaque block
+                        # Fixed opaque block
+                        row.append(Block('opaque', fixed=True))
                     elif char == 'C':
-                        row.append(Block('refract', fixed=True))  # Fixed refract block
+                        # Fixed refract block
+                        row.append(Block('refract', fixed=True))
                 grid.append(row)
             elif line.startswith('A') or line.startswith('B') or line.startswith('C'):
                 block_type, count = line.split()
