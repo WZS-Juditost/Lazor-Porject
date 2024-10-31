@@ -1,14 +1,111 @@
 class Block:
+    '''
+    A class representing a block in the Lazors game grid.
+
+    Attributes:
+        block_type (str): 
+            The type of the block ('reflect', 'opaque', 'refract', 'empty').
+        fixed (bool): 
+            Whether the block is fixed in position (True) or movable (False).
+    '''
+
     def __init__(self, block_type, fixed=False):
+        '''
+        Initializes a Block instance with a specified type and fixed status.
+
+        Args:
+            block_type (str): 
+                Type of the block ('reflect', 'opaque', 'refract', 'empty').
+            fixed (bool, optional): 
+                If True, the block is fixed in place. Otherwise, it is movable. 
+                Default is False.
+        '''
         self.block_type = block_type  # 'reflect', 'opaque', 'refract', 'empty'
         self.fixed = fixed
 
 class Laser:
+    '''
+    A class representing a laser in the Lazors game.
+
+    Attributes:
+        x (int): 
+            The x-coordinate of the laser's starting position.
+        y (int): 
+            The y-coordinate of the laser's starting position.
+        vx (int): 
+            The x-component of the laser's direction vector (can be 0, 1 or -1).
+        vy (int): 
+            The y-component of the laser's direction vector (can be 0, 1 or -1).
+    '''
+
     def __init__(self, x, y, vx, vy):
+        '''
+        Initializes a Laser instance with a starting position and direction vector.
+
+        Args:
+            x (int): 
+                The x-coordinate of the laser's starting position.
+            y (int): 
+                The y-coordinate of the laser's starting position.
+            vx (int): 
+                The x-component of the laser's direction vector (0, 1 or -1).
+            vy (int): 
+                The y-component of the laser's direction vector (0,1 or -1).
+        '''
         self.x = x
         self.y = y
         self.vx = vx
         self.vy = vy
+
+    def move(self):
+        '''
+        Updates the laser's position based on its current direction.
+
+        Returns:
+            tuple: The new (x, y) position after moving.
+        '''
+        self.x += self.vx
+        self.y += self.vy
+        return (self.x, self.y)
+
+    def reflect_x(self):
+        '''
+        Reflects the laser along the x-axis by reversing
+        the x-component of the direction vector.
+        '''
+        self.vx = -self.vx
+
+    def reflect_y(self):
+        '''
+        Reflects the laser along the y-axis by reversing
+        the y-component of the direction vector.
+        '''
+        self.vy = -self.vy
+
+    def refract(self):
+        '''
+        Generates a new Laser object to represent the refracted laser.
+
+        Returns:
+            Laser: 
+                A new laser with the same position and opposite direction vector.
+        '''
+        return Laser(self.x, self.y, -self.vx, -self.vy)
+    
+    def absorb(self):
+        '''
+        Terminates the laser's movement by setting its direction to (0, 0).
+        '''
+        self.vx, self.vy = 0, 0
+
+    def current_position(self):
+        '''
+        Returns the current position of the laser.
+
+        Returns:
+            tuple: The (x, y) position of the laser.
+        '''
+        return (self.x, self.y)
 
 class Board:
     def __init__(self, grid, lasers, targets):
@@ -24,10 +121,22 @@ class Board:
         if not self.grid[y][x].fixed:
             self.grid[y][x] = Block('empty')
 
-    def withIn_bounds(self, x, y):
+    def is_within_bounds(self, x, y):
         return 0 <= x < len(self.grid[0]) and 0 <= y < len(self.grid)
 
-def parse_file(file_path):
+def read_bff_file(file_path):
+    '''
+    This function opens and parses a .bff file line by line, 
+    getting all the information and storing them in a dictionary.
+
+    Args:
+        file_path (string):
+            The path to the .bff file to be read
+
+    Returns:
+        data (dictionary):
+            A dictionary containing the grid, blocks, lasers, and points.
+    '''
     grid = []
     lasers = []
     points = []
@@ -72,4 +181,12 @@ def parse_file(file_path):
                 _, x, y = line.split()
                 points.append((int(x), int(y)))
 
-    return Board(grid, lasers, points), avaliable_blocks
+    # Create a data dictionary to store all the parsed information
+    data = {
+        'grid': grid,
+        'lasers': lasers,
+        'points': points,
+        'avaliable_blocks': avaliable_blocks
+    }
+
+    return data
