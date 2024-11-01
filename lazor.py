@@ -213,7 +213,27 @@ class Grid:
                 if self.get_block(x, y).is_empty():
                     empty_positions.append((x, y))
         return empty_positions
+    
+    def place_block(self, x, y, block_type):
+        '''
+        Places a new block of a specified type at a given position.
 
+        Args:
+            x (int):
+                The x-coordinate where the block will be placed.
+            y (int):
+                The y-coordinate where the block will be placed.
+            block_type (str):
+                Type of the block to place.
+
+        Returns:
+            bool: 
+                True if the block was placed successfully, False if the position was not empty.
+        '''
+        if self.is_within_bounds(x, y) and self.get_block(x, y).is_empty():
+            self.set_block(x, y, Block(block_type))
+            return True
+        return False
 
 def read_bff_file(file_path):
     '''
