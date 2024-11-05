@@ -303,5 +303,116 @@ def read_bff_file(file_path):
         'points': points,
         'avaliable_blocks': avaliable_blocks
     }
+import itertools
+
+class LazorGame:
+    '''
+    A class representing the overall Lazors game, handling grid setup,
+    laser movement, block placement, and solution validation.
+    '''
+
+    def __init__(self, file_path):
+        '''
+        Initializes the LazorGame with a parsed .bff file configuration.
+
+        Args:
+            file_path (str): Path to the .bff file with game setup.
+        '''
+        data = read_bff_file(file_path)
+        self.grid = Grid(data['grid'])
+        self.lasers = data['lasers']
+        self.points = set(data['points'])  # Convert to set for fast lookup
+        self.available_blocks = data['avaliable_blocks']
+        self.solution_found = False
+
+    def run_laser(self, laser):
+        '''
+        Traces the path of a laser, recording positions it intersects.
+
+        Args:
+            laser (Laser): The laser instance to move along the grid.
+
+        Returns:
+            set: A set of (x, y) positions the laser intersects.
+        '''
+        laser_path = set()
+        while laser.vx != 0 or laser.vy != 0:
+            x, y = laser.move()
+            if not self.grid.is_within_bounds(x, y):
+                break
+
+            block = self.grid.get_block(x, y)
+            if block.can_interact_with_laser():
+                if block.block_type == 'reflect':
+                    laser.reflect_x() if laser.vx else laser.reflect_y()
+                elif block.block_type == 'opaque':
+                    laser.absorb()
+                elif block.block_type == 'refract':
+                    laser_path.add((x, y))
+                    self.lasers.append(laser.refract_x())
+                    self.lasers.append(laser.refract_y())
+            laser_path.add((x, y))
+        return laser_path
+
+    def validate_solution(self):
+        '''
+        Checks if all target points are intersected by lasers.
+
+        Returns:
+            bool: True if all points are intersected, False otherwise.
+        '''
+        hit_points = set()
+        for laser in self.lasers:
+            hit_points.update(self.run_laser(laser))
+        return self.points.issubset(hit_points)
+
+    def attempt_block_placements(self):
+        '''
+        Attempts various placements of available blocks in empty positions
+        to find a solution that intersects all target points.
+        '''
+        empty_positions = self.grid.find_empty_positions()
+        block_types = [bt for bt, count in self.available_blocks.items() for _ in range(count)]
+
+        for placement in itertools.permutations(block_types, len(empty_positions)):
+            for pos, block_type in zip(empty_positions, placement):
+                x, y = pos
+                self.grid.place_block(x, y, block_type)
+            
+            if self.validate_solution():
+                self.solution_found = True
+                self.output_solution()
+                return
+
+            # Reset the grid for next configuration
+            for x, y in empty_positions:
+                self.grid.set_block(x, y, Block('empty'))
+
+    def output_solution(self):
+        '''
+        Outputs the solution in a readable format, either as a text file or a visual representation.
+        '''
+        print("Solution Found!")
+        for y, row in enumerate(self.grid.grid):
+            for x, block in enumerate(row):
+                if block.fixed:
+                    print(block.block_type[0].upper(), end=" ")
+                elif block.block_type != 'empty':
+                    print(block.block_type[0].lower(), end=" ")
+                else:
+                    print(".", end=" ")
+            print()
+        print("Target points achieved.")
+
+def main():
+    # Initialize the Lazor game with the .bff file
+    game = LazorGame('path_to_your_file.bff')
+    # Attempt block placements and output solution if found
+    game.attempt_block_placements()
+    if not game.solution_found:
+        print("No solution found.")
+
+if __name__ == '__main__':
+    main()
 
     return data
