@@ -307,7 +307,7 @@ import itertools
 
 class LazorGame:
     '''
-    A class representing the overall Lazors game, handling grid setup,
+    A class representing handling grid setup,
     laser movement, block placement, and solution validation.
     '''
 
@@ -356,7 +356,7 @@ class LazorGame:
 
     def validate_solution(self):
         '''
-        Checks if all target points are intersected by lasers.
+        Checks whether all the target points are intersected by lasers.
 
         Returns:
             bool: True if all points are intersected, False otherwise.
@@ -368,7 +368,7 @@ class LazorGame:
 
     def attempt_block_placements(self):
         '''
-        Attempts various placements of available blocks in empty positions
+        Attempts all the different possibilities of available blocks in empty positions
         to find a solution that intersects all target points.
         '''
         empty_positions = self.grid.find_empty_positions()
@@ -405,9 +405,7 @@ class LazorGame:
         print("Target points achieved.")
 
 def main():
-    # Initialize the Lazor game with the .bff file
     game = LazorGame('dark_1.bff')
-    # Attempt block placements and output solution if found
     game.attempt_block_placements()
     if not game.solution_found:
         print("No solution found.")
