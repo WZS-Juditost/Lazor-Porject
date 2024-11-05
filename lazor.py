@@ -406,7 +406,7 @@ class LazorGame:
 
 def main():
     # Initialize the Lazor game with the .bff file
-    game = LazorGame('path_to_your_file.bff')
+    game = LazorGame('dark_1.bff')
     # Attempt block placements and output solution if found
     game.attempt_block_placements()
     if not game.solution_found:
