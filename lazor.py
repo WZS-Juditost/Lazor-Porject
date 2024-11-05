@@ -303,6 +303,7 @@ def read_bff_file(file_path):
         'points': points,
         'avaliable_blocks': avaliable_blocks
     }
+return data
 import itertools
 
 class LazorGame:
@@ -413,4 +414,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-    return data
+
