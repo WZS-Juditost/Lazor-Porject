@@ -1,7 +1,101 @@
+"""
+Lazor Game Solver
+
+This program is a solver for the Lazor game. Lazor is a puzzle game in which
+the player must arrange blocks on a grid to direct laser beams to specific
+target points. Each puzzle is defined in a .bff file, which specifies the grid
+layout, available blocks, laser starting positions, directions, and target
+points. The goal is to place blocks in the correct positions to ensure that
+all laser beams intersect the target points.
+
+Game Logic:
+-----------
+1. The game grid consists of cells that can contain different types of blocks.
+   The lasers start from specific grid cells with given directions.
+
+2. The player places blocks of various types in empty grid cells. Each block
+   type interacts with the lasers differently, either reflecting, absorbing,
+   or allowing the laser to pass through and split.
+
+3. The solver tries different configurations of block placements until it
+   finds a solution where all lasers intersect the specified target points.
+
+4. The solution is saved as a visual representation in an image file,
+   displaying the grid layout, blocks, laser paths, start points,
+   and target points.
+
+Block Types:
+------------
+The game includes several block types, each represented by a specific symbol:
+'reflect' (Symbol: 'A'):
+    Reflects the laser, change its direction by 90 degrees.
+'opaque' (Symbol: 'B'):
+    Blocks and absorbs the laser beam, preventing it from passing through.
+'refract' (Symbol: 'C'):
+    Allows the laser to pass through while also creating a reflected beam.
+'empty' (Symbol: 'o'):
+    An empty space where a block can be placed .
+'none' (Symbol: 'x'):
+    Represents unavaible. No block can be place on this cell.
+'laser' (Symbol: 'L'):
+    Represents a laser intersects this cell, used for displaying solution only.
+
+Laser:
+------
+The `Laser` class represents a laser beam in the Lazor game. Each laser has:
+`x` and `y`:
+    The initial coordinates of the laser's starting position on the grid.
+`vx` and `vy`:
+    The direction of the laser beam along the x and y axis.
+
+Attributes:
+-----------
+`self.grid`:
+    The grid object containing all the blocks in the puzzle.
+`self.lasers`:
+    A list of `Laser` objects, each representing a laser's
+    starting position and direction.
+`self.points`:
+    A set of target points that lasers must intersect to solve the puzzle.
+`self.available_blocks`:
+    A dictionary of block types and their available counts.
+`self.solution_found`:
+    A boolean flag indicating whether a solution has been found.
+`self.initial_lasers`:
+    A copy of the initial laser positions and directions for reset purposes.
+
+Main Solver Flow:
+-----------------
+1. The solver reads the grid configuration and laser setup
+   from the specified .bff file.
+2. It generates all possible placements for the blocks
+   based on their availability and tries each configuration.
+3. For each configuration, it simulates the laser paths
+   based on block interactions.
+4. If all target points are hit by lasers, the solution is considered found.
+5. The final solution is saved as an image.
+
+Classes:
+--------
+`Block`:
+    Represents a block in the grid with a specified type and fixed status.
+`Laser`:
+    Represents a laser beam with initial coordinates and direction.
+`Grid`:
+    Manages the game grid and contains methods for managing blocks.
+`LazorGame`:
+    Handles the game logic, solving process, and saving solutions.
+
+"""
+
 import os
 import time
 import copy
 import itertools
+from PIL import Image, ImageDraw, ImageFont
+import math
+
+
 class Block:
     '''
     A class representing a block in the Lazors game grid.
@@ -43,7 +137,8 @@ class Block:
 
         Returns:
             bool:
-                True if the block is 'reflect', 'opaque', or 'refract', False otherwise.
+                True if the block is 'reflect', 'opaque', or 'refract'.
+                False otherwise.
         '''
         return self.block_type in ('reflect', 'opaque', 'refract')
 
@@ -58,14 +153,14 @@ class Laser:
         y (int):
             The y-coordinate of the laser's starting position.
         vx (int):
-            The x-component of the laser's direction vector (can be 0, 1 or -1).
+            The x-component of the laser's direction vector.
         vy (int):
-            The y-component of the laser's direction vector (can be 0, 1 or -1).
+            The y-component of the laser's direction vector.
     '''
 
     def __init__(self, x, y, vx, vy):
         '''
-        Initializes a Laser instance with a starting position and direction vector.
+        Initializes a Laser instance with a starting position and direction.
 
         Args:
             x (int):
@@ -109,7 +204,7 @@ class Laser:
 
     def refract_x(self):
         '''
-        Generates a new Laser object with the x-component of the direction vector reversed.
+        Generates new Laser with x-component of the direction vector reversed.
 
         Returns:
             Laser:
@@ -120,7 +215,7 @@ class Laser:
 
     def refract_y(self):
         '''
-        Generates a new Laser object with the y-component of the direction vector reversed.
+        Generates new Laser with y-component of the direction vector reversed.
 
         Returns:
             Laser:
@@ -144,6 +239,7 @@ class Laser:
         '''
         return (self.x, self.y)
 
+
 class Grid:
     '''
     A class representing the game grid in the Lazors game.
@@ -158,7 +254,8 @@ class Grid:
         Initializes a Grid instance with a specified grid layout.
 
         Args:
-            grid (list): A 2D list containing Block objects that define the initial grid layout.
+            grid (list):
+               Containing Block objects that define the initial grid layout.
         '''
         self.grid = grid
         self.initial_grid = copy.deepcopy(grid)
@@ -202,7 +299,7 @@ class Grid:
                 True if the position is within bounds, False otherwise.
         '''
         return 0 <= x < len(self.grid[0]) and 0 <= y < len(self.grid)
-    
+
     def reset_to_initial(self):
         '''
         Resets the grid back to its initial configuration.
@@ -223,7 +320,7 @@ class Grid:
                 if self.get_block(x, y).is_empty():
                     empty_positions.append((x, y))
         return empty_positions
-    
+
     def place_block(self, x, y, block_type):
         '''
         Places a new block of a specified type at a given position.
@@ -237,19 +334,21 @@ class Grid:
                 Type of the block to place.
 
         Returns:
-            bool: 
-                True if the block was placed successfully, False if the position was not empty.
+            bool:
+                True if the block was placed successfully.
+                False if the position was not empty.
         '''
         if self.is_within_bounds(x, y) and self.get_block(x, y).is_empty():
             self.set_block(x, y, Block(block_type))
             return True
         return False
 
+
 def read_bff_file(file_path):
     '''
     This function opens and parses a .bff file line by line,
     getting all the information and storing them in a dictionary.
-    It adds 'none' fixed blocks around each row, between elements, 
+    It adds 'none' fixed blocks around each row, between elements,
     and rows between each line in the grid.
 
     Args:
@@ -258,7 +357,7 @@ def read_bff_file(file_path):
 
     Returns:
         data (dictionary):
-            A dictionary containing the padded grid, blocks, lasers, and points.
+            A dictionary containing the grid, blocks, lasers, and points.
     '''
     grid = []
     lasers = []
@@ -281,7 +380,8 @@ def read_bff_file(file_path):
                 grid_section = False
                 continue
             if grid_section:
-                row = [Block('none', fixed=True)]  # Start with a 'none' fixed block for padding
+                # Start with a 'none' fixed block for padding
+                row = [Block('none', fixed=True)]
                 for char in line:
                     if char == 'x':
                         row.append(Block('none', fixed=True))
@@ -299,7 +399,9 @@ def read_bff_file(file_path):
                         row.append(Block('refract', fixed=True))
                         row.append(Block('none', fixed=True))
                 grid.append(row)
-            elif line.startswith('A') or line.startswith('B') or line.startswith('C'):
+            elif (line.startswith('A') or
+                  line.startswith('B') or
+                  line.startswith('C')):
                 block_type, count = line.split()
                 avaliable_blocks[block_type] = int(count)
             elif line.startswith('L'):
@@ -309,7 +411,8 @@ def read_bff_file(file_path):
                 _, x, y = line.split()
                 points.append((int(x), int(y)))
 
-    # Adding rows of 'none' fixed blocks above, between, and below the main grid
+    # Adding rows of 'none' fixed blocks above, between, and below the main
+    # grid
     padded_grid = [[Block('none', fixed=True)] * len(grid[0])]
     for row in grid:
         padded_grid.append(row)
@@ -325,6 +428,7 @@ def read_bff_file(file_path):
 
     return data
 
+
 class LazorGame:
     '''
     A class representing the Lazor Game, handling grid setup,
@@ -336,28 +440,34 @@ class LazorGame:
         Initializes the LazorGame with a parsed .bff file configuration.
 
         Args:
-            file_path (str): 
+            file_path (str):
                 Path to the .bff file with game setup.
         '''
         # Read and parse data from the .bff file
+        self.file_path = file_path
         data = read_bff_file(file_path)
-        
+
         # Initialize grid, lasers, points, and available blocks
         self.grid = Grid(data['grid'])
         self.lasers = data['lasers']
         self.points = set(data['points'])
         self.available_blocks = data['avaliable_blocks']
         self.solution_found = False
-        self.initial_lasers = [Laser(laser.x, laser.y, laser.vx, laser.vy) for laser in data['lasers']]
+        self.initial_lasers = [
+            Laser(
+                laser.x,
+                laser.y,
+                laser.vx,
+                laser.vy) for laser in data['lasers']]
 
     def process_laser_paths(self, lasers):
         '''
         Calls laser_path for each laser and updates the grid with laser paths,
         handling any new lasers generated by refraction. Additionally, checks
-        if all target points are intersected by lasers to validate the solution.
+        if all target points are intersected by lasers to validate solution.
 
         Returns:
-            bool: 
+            bool:
                 True if the solution is valid, False otherwise.
         '''
         laser_queue = list(lasers)
@@ -372,6 +482,9 @@ class LazorGame:
                     if self.grid.is_within_bounds(x, y):
                         # Add to hit points set
                         hit_points.add((x, y))
+                        block_type = self.grid.get_block(x, y).block_type
+                        if block_type == 'empty' or block_type == 'none':
+                            self.grid.grid[y][x] = Block('laser', fixed=True)
 
             laser_queue.extend(laser_data['new_lasers'])
 
@@ -379,10 +492,11 @@ class LazorGame:
 
     def print_grid(self, grid):
         '''
-        Prints the grid in a readable format, marking blocks and lasers appropriately.
+        Prints the grid in a readable format,
+        marking blocks and lasers appropriately.
 
         Args:
-            grid (list of list of Block): 
+            grid (list of list of Block):
                 A 2D list representing the game grid.
         '''
         for row in grid:
@@ -402,20 +516,23 @@ class LazorGame:
 
     def calculate_laser_path(self, grid_obj, laser_objs):
         '''
-        Traces the paths of lasers in the grid, updating positions based on interactions.
+        Traces the paths of lasers in the grid,
+        updating positions based on interactions.
 
         Args:
-            grid_obj (Grid): 
-                An instance of the Grid class, representing the current state of the game grid.
-            laser_objs (list of Laser): 
-                A list of Laser instances, each representing a laser with a starting position and direction.
+            grid_obj (Grid):
+                An instance of the Grid class,
+                representing the current state of the game grid.
+            laser_objs (list of Laser):
+                A list of Laser instances, each representing
+                a laser with a starting position and direction.
 
         Returns:
-            dict: 
+            dict:
                 A dictionary with positions and new_lasers:
-                    positions (list of list of tuple): 
-                        Each sublist represents the path taken by a laser in the grid.
-                    new_lasers (list of Laser): 
+                    positions (list of list of tuple):
+                        Each sublist represents the path taken by a laser.
+                    new_lasers (list of Laser):
                         A list of new Laser instances created by refraction.
         '''
         MAX_STEPS = 500
@@ -425,7 +542,7 @@ class LazorGame:
         for laser in laser_objs:
             current_positions = []
             current_positions.append(laser.current_position())
-            
+
             steps = 0
 
             while steps < MAX_STEPS:  # Stop if steps exceed MAX_STEPS
@@ -438,7 +555,7 @@ class LazorGame:
                 if not grid_obj.is_within_bounds(x_new[0], x_new[1]):
                     break
                 elif not grid_obj.is_within_bounds(y_new[0], y_new[1]):
-                    break 
+                    break
 
                 x_block = grid_obj.get_block(x_new[0], x_new[1])
                 y_block = grid_obj.get_block(y_new[0], y_new[1])
@@ -451,7 +568,8 @@ class LazorGame:
                     laser.reflect_y()
                     new_pos = laser.move()
                     current_positions.append(new_pos)
-                elif x_block.block_type == 'opaque' or y_block.block_type == 'opaque':
+                elif (x_block.block_type == 'opaque' or
+                      y_block.block_type == 'opaque'):
                     laser.absorb()
                     break
                 elif x_block.block_type == 'refract':
@@ -464,10 +582,12 @@ class LazorGame:
                     new_pos = laser.move()
                     current_positions.append(new_pos)
                     new_lasers.append(new_laser)
-                elif x_block.block_type == 'empty' or y_block.block_type == 'empty':
+                elif (x_block.block_type == 'empty' or
+                      y_block.block_type == 'empty'):
                     new_pos = laser.move()
                     current_positions.append(new_pos)
-                elif x_block.block_type == 'none' or y_block.block_type == 'none':
+                elif (x_block.block_type == 'none' or
+                      y_block.block_type == 'none'):
                     new_pos = laser.move()
                     current_positions.append(new_pos)
 
@@ -478,49 +598,56 @@ class LazorGame:
             positions.append(current_positions)
 
         return {'positions': positions, 'new_lasers': new_lasers}
-    
+
     def all_possible_configs(self, grid_obj, block_dict):
         '''
         Generates all possible configurations for placing blocks on the grid.
 
         Args:
-            grid_obj (Grid): 
+            grid_obj (Grid):
                 An instance of the Grid class.
-            block_dict (dict): 
+            block_dict (dict):
                 A dictionary with block types as keys and counts as values.
 
         Returns:
-            block_configs (list of list of tuple): 
-                Each inner list contains tuples representing possible positions for each block.
+            block_configs (list of list of tuple):
+                Each inner list contains tuples
+                representing possible positions for each block.
         '''
-        block_list = [Block(block_type) for block_type, count in block_dict.items() for _ in range(count)]
+        block_list = [Block(block_type) for block_type,
+                      count in block_dict.items() for _ in range(count)]
         available_positions = grid_obj.find_empty_positions()
-        all_same_type = all(block.block_type == block_list[0].block_type for block in block_list)
+        all_same_type = all(
+            block.block_type ==
+            block_list[0].block_type for block in block_list)
         if all_same_type:
             # Use combinations if all blocks are of the same type
             block_configs = [
                 list(positions)
-                for positions in itertools.combinations(available_positions, len(block_list))
+                for positions in itertools.combinations(
+                    available_positions, len(block_list))
             ]
         else:
             # Use permutations if blocks are of different types
             block_configs = [
                 list(positions)
-                for positions in itertools.permutations(available_positions, len(block_list))
+                for positions in itertools.permutations(
+                    available_positions, len(block_list))
             ]
 
         return block_configs
-    
+
     def solve(self):
         '''
         Attempts to solve the puzzle by trying different block placements.
-        
+
         Returns:
-            bool: 
+            bool:
                 True if a solution is found, False otherwise.
         '''
         # Generate all possible configurations of block placements
-        block_configurations = self.all_possible_configs(self.grid, self.available_blocks)
+        block_configurations = self.all_possible_configs(
+            self.grid, self.available_blocks)
 
         for config in block_configurations:
             self.place_blocks_in_grid(config)
@@ -543,11 +670,12 @@ class LazorGame:
         Places blocks on the grid based on the provided configuration.
 
         Args:
-            config (list of tuples): 
+            config (list of tuples):
                 List of positions where each block should be placed.
         '''
         block_type_mapping = {'A': 'reflect', 'B': 'opaque', 'C': 'refract'}
-        # Map available blocks to their types and place them in specified positions
+        # Map available blocks to their types and place them in specified
+        # positions
         block_list = []
         for block_letter, count in self.available_blocks.items():
             actual_type = block_type_mapping.get(block_letter, 'empty')
@@ -558,17 +686,17 @@ class LazorGame:
 
     def reset_lasers(self):
         '''
-        Resets the lasers to only the original lasers with their initial states.
+        Resets the lasers to the original lasers with their initial states.
         '''
-        self.lasers = [Laser(laser.x, laser.y, laser.vx, laser.vy) for laser in self.initial_lasers]
-
+        self.lasers = [Laser(laser.x, laser.y, laser.vx, laser.vy)
+                       for laser in self.initial_lasers]
 
     def validate_solution(self):
         '''
         Checks if all target points are intersected by lasers.
 
         Returns:
-            bool: 
+            bool:
                 True if all points are intersected, False otherwise.
         '''
         hit_points = set()
@@ -577,23 +705,246 @@ class LazorGame:
             for path in laser_data['positions']:
                 hit_points.update(path)
         return self.points.issubset(hit_points)
-    
+
     def output_solution(self):
         '''
-        Outputs the final solution with blocks and laser paths in the grid.
+        Outputs the final solution.
         '''
         print("\nFinal Solution:")
-        self.print_grid(self.grid.grid)
-        print("\nTarget points have been successfully intersected by lasers.")
+
+        # Create a set of laser starting points for easy lookup
+        laser_start_points = {(laser.x, laser.y)
+                              for laser in self.initial_lasers}
+
+        # Print the grid with blocks, laser paths, laser start points, and
+        # target points
+        for y, row in enumerate(self.grid.grid):
+            row_repr = []
+            for x, block in enumerate(row):
+                if (x, y) in laser_start_points:
+                    # Mark laser starting points (using 'S' here)
+                    row_repr.append('S')
+                elif (x, y) in self.points:
+                    # Mark target points (using 'T' here)
+                    row_repr.append('T')
+                elif block.block_type == 'laser':
+                    row_repr.append('L')
+                elif block.block_type == 'reflect':
+                    row_repr.append('A')
+                elif block.block_type == 'opaque':
+                    row_repr.append('B')
+                elif block.block_type == 'refract':
+                    row_repr.append('C')
+                elif block.block_type == 'empty':
+                    row_repr.append('o')
+                else:
+                    row_repr.append('.')
+            print(' '.join(row_repr))
+
+        print(
+            "\nAll target points successfully intersects by lasers.")
+
+        # Print each block's position
+        print("\nBlocks placed:")
+        for y, row in enumerate(self.grid.grid):
+            for x, block in enumerate(row):
+                if block.block_type in ['reflect', 'opaque', 'refract']:
+                    print(
+                        f"Block '{block.block_type}' placed at position "
+                        f"({x}, {y})"
+                    )
+
+        # Print laser start points
+        print("\nLaser starting points:")
+        for point in laser_start_points:
+            print(f"Laser starts at position {point}")
+
+    def save_solution_as_image(self, solve_time):
+        '''
+        Saves the solved grid as an image
+        in the 'solution' folder with additional information.
+
+        Args:
+            solve_time (float):
+                The time taken to solve the puzzle, in seconds.
+        '''
+        # Ensure the 'solution' folder exists
+        solution_dir = "solution"
+        os.makedirs(solution_dir, exist_ok=True)
+        cell_size = 30
+        grid_width = len(self.grid.grid[0]) * cell_size
+        grid_height = len(self.grid.grid) * cell_size
+
+        # Font setup
+        font_size = 11
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except IOError:
+            font = ImageFont.load_default()
+
+        text_lines = [
+            f"Game: {os.path.basename(self.file_path)}",
+            f"Time to solve: {solve_time:.2f} seconds",
+            "Blocks placed:",
+            *[f"- {block.block_type.capitalize()} at ({x}, {y})"
+              for y, row in enumerate(self.grid.grid)
+              for x, block in enumerate(row)
+              if block.block_type in ['reflect', 'opaque', 'refract']],
+            "Laser starting points:",
+            *[f"- Start at ({x}, {y}) with direction ({vx}, {vy})"
+              for (x, y), (vx, vy) in {
+                  (laser.x, laser.y): (laser.vx, laser.vy)
+                  for laser in self.initial_lasers
+              }.items()]
+        ]
+
+        text_space_height = sum(
+            font.getbbox(line)[3] + 5 for line in text_lines) + 10
+        image_height = grid_height + text_space_height
+        image = Image.new('RGB', (grid_width, image_height), 'white')
+        draw = ImageDraw.Draw(image)
+
+        colors = {
+            'reflect': 'blue',
+            'opaque': 'orange',
+            'refract': 'yellow',
+            'empty': 'gray',
+            'none': 'white'
+        }
+        labels = {
+            'reflect': 'A',
+            'opaque': 'B',
+            'refract': 'C',
+            'laser_start': 'S',
+            'target': 'T'
+        }
+
+        laser_start_points = {(laser.x, laser.y): (laser.vx, laser.vy)
+                              for laser in self.initial_lasers}
+        for y, row in enumerate(self.grid.grid):
+            for x, block in enumerate(row):
+                top_left = (x * cell_size, y * cell_size)
+                bottom_right = ((x + 1) * cell_size, (y + 1) * cell_size)
+
+                if (x, y) in laser_start_points:
+                    draw.rectangle([top_left, bottom_right], fill="red")
+                    # Draw an arrow based on the laser's direction
+                    vx, vy = laser_start_points[(x, y)]
+                    center = (
+                        top_left[0] + cell_size // 2,
+                        top_left[1] + cell_size // 2)
+                    arrow_length = cell_size // 2
+                    arrow_end = (
+                        center[0] + arrow_length * vx,
+                        center[1] + arrow_length * vy
+                    )
+                    draw.line([center, arrow_end], fill="white", width=2)
+                    # Draw arrowhead
+                    arrowhead_length = 6
+                    angle_offset = math.pi / 6
+                    angle_main = math.atan2(vy, vx)
+                    left_end = (
+                        arrow_end[0] -
+                        arrowhead_length *
+                        math.cos(
+                            angle_main +
+                            angle_offset),
+                        arrow_end[1] -
+                        arrowhead_length *
+                        math.sin(
+                            angle_main +
+                            angle_offset))
+                    right_end = (
+                        arrow_end[0] -
+                        arrowhead_length *
+                        math.cos(
+                            angle_main -
+                            angle_offset),
+                        arrow_end[1] -
+                        arrowhead_length *
+                        math.sin(
+                            angle_main -
+                            angle_offset))
+                    draw.line([arrow_end, left_end], fill="white", width=2)
+                    draw.line([arrow_end, right_end], fill="white", width=2)
+                    draw.text(
+                        (top_left[0] + cell_size // 5,
+                         top_left[1] + cell_size // 3),
+                        labels['laser_start'],
+                        fill="white",
+                        font=font)
+
+                elif (x, y) in self.points:
+                    draw.rectangle([top_left, bottom_right],
+                                   outline="green", width=3)
+                    draw.text(
+                        (top_left[0] + cell_size // 5,
+                         top_left[1] + cell_size // 3),
+                        labels['target'],
+                        fill="green",
+                        font=font)
+                else:
+                    color = colors.get(block.block_type, 'white')
+                    draw.rectangle([top_left, bottom_right], fill=color)
+                    if block.block_type in labels:
+                        draw.text((top_left[0] + cell_size // 5,
+                                   top_left[1] + cell_size // 3),
+                                  labels[block.block_type],
+                                  fill="black",
+                                  font=font)
+
+        # Draw grid lines
+        for i in range(1, len(self.grid.grid[0])):
+            x = i * cell_size
+            draw.line([(x, 0), (x, grid_height)], fill="black", width=1)
+        for i in range(1, len(self.grid.grid)):
+            y = i * cell_size
+            draw.line([(0, y), (grid_width, y)], fill="black", width=1)
+
+        # Draw laser path dots for cells with laser path
+        for y, row in enumerate(self.grid.grid):
+            for x, block in enumerate(row):
+                if block.block_type == 'laser' and (
+                        x, y) not in laser_start_points:
+                    center = (
+                        x * cell_size + cell_size // 2,
+                        y * cell_size + cell_size // 2)
+                    draw.ellipse([center[0] - 2, center[1] - 2,
+                                 center[0] + 2, center[1] + 2], fill="red")
+
+        # Add text information at the bottom of the image
+        text_y = grid_height + 10
+        for line in text_lines:
+            draw.text((10, text_y), line, fill="black", font=font)
+            text_y += font.getbbox(line)[3] + 5
+
+        # Save the image
+        filename = os.path.basename(self.file_path)
+        solution_filename = os.path.join(
+            solution_dir, f"{os.path.splitext(filename)[0]}_solution.png")
+        image.save(solution_filename)
+
+        print(f"Solution saved as an image to {solution_filename}")
+
 
 def main():
     print("Welcome to the Lazor Game Solver!")
     print("=================================")
-    print("This tool attempts to find solutions for Lazor game puzzles defined in .bff files.")
-    print("You can either solve a single puzzle by specifying its file path or solve all puzzles in the 'bff_files' folder.")
+    print(
+        "This tool attempts to find solutions for Lazor game puzzles"
+        "defined in .bff files."
+    )
+    print(
+        "You can either solve a single puzzle by specifying its file path or "
+        "solve all puzzles in the 'bff_files' folder."
+    )
+
     print("Let's get started!\n")
 
-    user_input = input("Enter the path to the .bff file you want to solve, or press Enter to solve all examples in 'bff_files': ").strip()
+    user_input = input(
+        "Enter the path to the .bff file you want to solve,"
+        "or press Enter to solve all examples in 'bff_files': "
+    ).strip()
     total_time = 0
     solved_files = 0
 
@@ -610,11 +961,18 @@ def main():
             if solved:
                 total_time += elapsed_time
                 solved_files += 1
-                print(f"Time taken for {user_input}: {elapsed_time:.2f} seconds\n")
+                # Pass solve_time to save_solution_as_image
+                game.save_solution_as_image(elapsed_time)
+                print(
+                    f"Time taken for {user_input}: "
+                    "{elapsed_time:.2f} seconds\n"
+                )
             else:
                 print(f"Failed to solve {user_input}.")
         else:
-            print("Invalid file path or file type. Please provide a valid .bff file.")
+            print("Invalid file path or file type."
+                  "Please provide a valid .bff file."
+                  )
             return
     else:
         # Run solver on all example files in the 'bff_files' directory
@@ -623,10 +981,10 @@ def main():
         for file_name in os.listdir(folder_path):
             if file_name.endswith('.bff'):
                 file_path = os.path.join(folder_path, file_name)
-                print(f"\nProcessing puzzle: {file_name}...")
+                print(f"\nSolving puzzle: {file_name}...")
 
                 start_time = time.time()
-                
+
                 game = LazorGame(file_path)
                 solved = game.solve()
 
@@ -634,7 +992,12 @@ def main():
                 if solved:
                     total_time += elapsed_time
                     solved_files += 1
-                    print(f"Time taken for {file_name}: {elapsed_time:.2f} seconds")
+                    # Pass solve_time to save_solution_as_image
+                    game.save_solution_as_image(elapsed_time)
+                    print(
+                        f"Time taken for {file_name}: "
+                        "{elapsed_time:.2f} seconds"
+                    )
                 else:
                     print(f"Failed to solve {file_name}.")
 
@@ -644,9 +1007,12 @@ def main():
         print(f"\nAll puzzles processed! Total puzzles solved: {solved_files}")
         print(f"Total time taken to solve puzzles: {total_time:.2f} seconds")
     else:
-        print("No puzzles were solved. Please ensure .bff files are available in the 'bff_files' folder.")
+        print("No puzzles were solved. Please ensure .bff files"
+              "are available in the 'bff_files' folder."
+              )
     print("Thank you for using the Lazor Game Solver!")
     print("=================================")
+
 
 if __name__ == '__main__':
     main()
