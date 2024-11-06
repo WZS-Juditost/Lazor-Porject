@@ -239,6 +239,8 @@ def read_bff_file(file_path):
     '''
     This function opens and parses a .bff file line by line,
     getting all the information and storing them in a dictionary.
+    It adds 'none' fixed blocks around each row, between elements, 
+    and rows between each line in the grid.
 
     Args:
         file_path (string):
@@ -246,7 +248,7 @@ def read_bff_file(file_path):
 
     Returns:
         data (dictionary):
-            A dictionary containing the grid, blocks, lasers, and points.
+            A dictionary containing the padded grid, blocks, lasers, and points.
     '''
     grid = []
     lasers = []
@@ -269,22 +271,23 @@ def read_bff_file(file_path):
                 grid_section = False
                 continue
             if grid_section:
-                row = []
+                row = [Block('none', fixed=True)]  # Start with a 'none' fixed block for padding
                 for char in line:
                     if char == 'x':
-                        # No block allowed
+                        row.append(Block('none', fixed=True))
                         row.append(Block('none', fixed=True))
                     elif char == 'o':
-                        row.append(Block('empty'))  # Block allowed
+                        row.append(Block('empty'))
+                        row.append(Block('none', fixed=True))
                     elif char == 'A':
-                        # Fixed reflect block
                         row.append(Block('reflect', fixed=True))
+                        row.append(Block('none', fixed=True))
                     elif char == 'B':
-                        # Fixed opaque block
                         row.append(Block('opaque', fixed=True))
+                        row.append(Block('none', fixed=True))
                     elif char == 'C':
-                        # Fixed refract block
                         row.append(Block('refract', fixed=True))
+                        row.append(Block('none', fixed=True))
                 grid.append(row)
             elif line.startswith('A') or line.startswith('B') or line.startswith('C'):
                 block_type, count = line.split()
@@ -296,122 +299,18 @@ def read_bff_file(file_path):
                 _, x, y = line.split()
                 points.append((int(x), int(y)))
 
+    # Adding rows of 'none' fixed blocks above, between, and below the main grid
+    padded_grid = [[Block('none', fixed=True)] * len(grid[0])]
+    for row in grid:
+        padded_grid.append(row)
+        padded_grid.append([Block('none', fixed=True)] * len(row))
+
     # Create a data dictionary to store all the parsed information
     data = {
-        'grid': grid,
+        'grid': padded_grid,
         'lasers': lasers,
         'points': points,
         'avaliable_blocks': avaliable_blocks
     }
-return data
-import itertools
 
-class LazorGame:
-    '''
-    A class representing handling grid setup,
-    laser movement, block placement, and solution validation.
-    '''
-
-    def __init__(self, file_path):
-        '''
-        Initializes the LazorGame with a parsed .bff file configuration.
-
-        Args:
-            file_path (str): Path to the .bff file with game setup.
-        '''
-        data = read_bff_file(file_path)
-        self.grid = Grid(data['grid'])
-        self.lasers = data['lasers']
-        self.points = set(data['points'])  # Convert to set for fast lookup
-        self.available_blocks = data['avaliable_blocks']
-        self.solution_found = False
-
-    def run_laser(self, laser):
-        '''
-        Traces the path of a laser, recording positions it intersects.
-
-        Args:
-            laser (Laser): The laser instance to move along the grid.
-
-        Returns:
-            set: A set of (x, y) positions the laser intersects.
-        '''
-        laser_path = set()
-        while laser.vx != 0 or laser.vy != 0:
-            x, y = laser.move()
-            if not self.grid.is_within_bounds(x, y):
-                break
-
-            block = self.grid.get_block(x, y)
-            if block.can_interact_with_laser():
-                if block.block_type == 'reflect':
-                    laser.reflect_x() if laser.vx else laser.reflect_y()
-                elif block.block_type == 'opaque':
-                    laser.absorb()
-                elif block.block_type == 'refract':
-                    laser_path.add((x, y))
-                    self.lasers.append(laser.refract_x())
-                    self.lasers.append(laser.refract_y())
-            laser_path.add((x, y))
-        return laser_path
-
-    def validate_solution(self):
-        '''
-        Checks whether all the target points are intersected by lasers.
-
-        Returns:
-            bool: True if all points are intersected, False otherwise.
-        '''
-        hit_points = set()
-        for laser in self.lasers:
-            hit_points.update(self.run_laser(laser))
-        return self.points.issubset(hit_points)
-
-    def attempt_block_placements(self):
-        '''
-        Attempts all the different possibilities of available blocks in empty positions
-        to find a solution that intersects all target points.
-        '''
-        empty_positions = self.grid.find_empty_positions()
-        block_types = [bt for bt, count in self.available_blocks.items() for _ in range(count)]
-
-        for placement in itertools.permutations(block_types, len(empty_positions)):
-            for pos, block_type in zip(empty_positions, placement):
-                x, y = pos
-                self.grid.place_block(x, y, block_type)
-            
-            if self.validate_solution():
-                self.solution_found = True
-                self.output_solution()
-                return
-
-            # Reset the grid for next configuration
-            for x, y in empty_positions:
-                self.grid.set_block(x, y, Block('empty'))
-
-    def output_solution(self):
-        '''
-        Outputs the solution in a readable format, either as a text file or a visual representation.
-        '''
-        print("Solution Found!")
-        for y, row in enumerate(self.grid.grid):
-            for x, block in enumerate(row):
-                if block.fixed:
-                    print(block.block_type[0].upper(), end=" ")
-                elif block.block_type != 'empty':
-                    print(block.block_type[0].lower(), end=" ")
-                else:
-                    print(".", end=" ")
-            print()
-        print("Target points achieved.")
-
-def main():
-    game = LazorGame('dark_1.bff')
-    game.attempt_block_placements()
-    if not game.solution_found:
-        print("No solution found.")
-
-if __name__ == '__main__':
-    main()
-
-
+    return data
