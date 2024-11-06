@@ -1,5 +1,4 @@
 # Lazor-Porject
-"""
 The Lazor Game Solver is a Python program designed to solve puzzles in the Lazor game. In Lazor, players arrange blocks on a grid to direct laser beams to specific target points. The game configuration is provided in `.bff` files, which specify the grid layout, available blocks, laser starting positions, directions, and target points. This program automates the solving process, saving the solution as both text and an image representation.
 
 ## Features
