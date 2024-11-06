@@ -314,3 +314,146 @@ def read_bff_file(file_path):
     }
 
     return data
+class LazorGame:
+    '''
+    A class for handling grid setup, laser movement, block placement, and solution validation.
+    '''
+
+    def __init__(self, file_path):
+        '''
+        Initializes the LazorGame with a parsed .bff file configuration.
+        '''
+        data = read_bff_file(file_path)
+        self.grid = Grid(data['grid'])
+        self.initial_lasers = data['lasers']  # Store original lasers to reset as needed
+        self.points = set(data['points'])
+        self.available_blocks = data['avaliable_blocks']
+        self.solution_found = False
+
+    def run_laser(self, laser):
+        '''
+        Traces the path of a laser, recording positions it intersects.
+        '''
+        laser_path = set()
+        additional_lasers = []
+
+        while laser.vx != 0 or laser.vy != 0:
+            x, y = laser.move()
+            if not self.grid.is_within_bounds(x, y):
+                break
+
+            block = self.grid.get_block(x, y)
+            laser_path.add((x, y))
+
+            if block.can_interact_with_laser():
+                if block.block_type == 'reflect':
+                    # Reflect based on the direction of the laser
+                    if laser.vx != 0:
+                        laser.reflect_x()
+                    if laser.vy != 0:
+                        laser.reflect_y()
+                    print(f"Laser reflected at ({x}, {y})")
+                elif block.block_type == 'opaque':
+                    laser.absorb()
+                    print(f"Laser absorbed at ({x}, {y})")
+                    break
+                elif block.block_type == 'refract':
+                    # Add two new lasers for refracted paths
+                    additional_lasers.append(laser.refract_x())
+                    additional_lasers.append(laser.refract_y())
+                    print(f"Laser refracted at ({x}, {y})")
+
+        # Process any additional refracted lasers
+        for new_laser in additional_lasers:
+            laser_path.update(self.run_laser(new_laser))
+
+        return laser_path
+
+    def validate_solution(self):
+        '''
+        Checks whether all the target points are intersected by lasers.
+        '''
+        hit_points = set()
+        # Reset lasers to their initial state for each validation
+        lasers = [Laser(l.x, l.y, l.vx, l.vy) for l in self.initial_lasers]
+
+        for laser in lasers:
+            hit_points.update(self.run_laser(laser))
+
+        print(f"Hit Points: {hit_points}")  # Debug output
+        print(f"Required Points: {self.points}")  # Debug output
+        return self.points.issubset(hit_points)
+
+    def attempt_block_placements(self):
+        '''
+        Recursively places blocks on the grid to find a configuration that hits all target points.
+        Uses a set to track visited configurations to avoid repeated attempts.
+        '''
+        empty_positions = self.grid.find_empty_positions()
+        block_types = {bt: count for bt, count in self.available_blocks.items() if count > 0}
+        visited = set()  # Track visited configurations based on placements
+
+        def place_blocks(index, current_placement):
+            '''
+            Recursively tries each block in each position to find a solution.
+
+            Args:
+                index (int): The index of the empty position being tried.
+                current_placement (tuple): Current sequence of block placements.
+
+            Returns:
+                bool: True if a solution is found; False otherwise.
+            '''
+            # Base case: If all positions are filled or a solution is found
+            if index == len(empty_positions):
+                # Convert current placement to a hashable form and check if visited
+                placement_key = tuple(sorted(current_placement))
+                if placement_key in visited:
+                    return False
+                visited.add(placement_key)  # Mark this placement as visited
+
+                # Validate the solution
+                if self.validate_solution():
+                    self.solution_found = True
+                    self.output_solution()
+                    return True
+
+                return False
+
+            # Recursive case: Try each block type at the current position
+            x, y = empty_positions[index]
+
+            for block_type in list(block_types.keys()):
+                if block_types[block_type] > 0:
+                    # Place the block, decrement its count, and add it to the current configuration
+                    self.grid.place_block(x, y, block_type)
+                    block_types[block_type] -= 1  # Decrement the count of available blocks
+                    print(f"Placing {block_type} block at ({x}, {y})")  # Debug output
+
+                    # Include the new placement in the current sequence
+                    new_placement = current_placement + ((x, y, block_type),)
+
+                    # Recurse to place the next block
+                    if place_blocks(index + 1, new_placement):
+                        return True  # Stop further recursion if a solution is found
+
+                    # Backtrack by removing the block and restoring the count
+                    self.grid.set_block(x, y, Block('empty'))
+                    block_types[block_type] += 1  # Restore the count of the block type
+                    print(f"Removing {block_type} block from ({x}, {y})")  # Debug output
+
+            return False
+
+        # Start the recursive placement from the first empty position with an empty configuration
+        if not place_blocks(0, ()):
+            print("No solution found.")
+
+def main():
+    game = LazorGame('numbered_6.bff')
+    game.attempt_block_placements()
+    if not game.solution_found:
+        print("No solution found.")
+
+
+if __name__ == '__main__':
+    main()
