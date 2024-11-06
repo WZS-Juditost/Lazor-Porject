@@ -77,8 +77,6 @@ class Laser:
         self.y = y
         self.vx = vx
         self.vy = vy
-        self.initial_position = (x, y)
-        self.initial_direction = (vx, vy)
 
     def move(self):
         '''
@@ -141,13 +139,6 @@ class Laser:
             tuple: The (x, y) position of the laser.
         '''
         return (self.x, self.y)
-    
-    def reset(self):
-        '''
-        Resets the laser to its initial position and direction.
-        '''
-        self.x, self.y = self.initial_position
-        self.vx, self.vy = self.initial_direction
 
 import copy
 class Grid:
@@ -354,6 +345,7 @@ class LazorGame:
         self.points = set(data['points'])
         self.available_blocks = data['avaliable_blocks']
         self.solution_found = False
+        self.initial_lasers = [Laser(laser.x, laser.y, laser.vx, laser.vy) for laser in data['lasers']]
 
         # Print the loaded configuration for debugging purposes
         print("=== Lazor Game Configuration ===")
@@ -374,17 +366,6 @@ class LazorGame:
 
         print("\n++++++++++++++++++++++++++++++")
 
-        # # Example of setting a block at a specific position
-        # self.grid.set_block(7, 3, Block('reflect'))
-        # self.grid.set_block(5, 1, Block('refract'))
-        # self.grid.set_block(1, 5, Block('reflect'))
-
-        # # Process initial laser paths
-        # self.process_laser_paths(self.lasers)
-
-        # print("\nUpdated Grid with Block and Laser Paths:")
-        # self.print_grid(self.grid.grid)
-
     def process_laser_paths(self, lasers):
         '''
         Calls laser_path for each laser and updates the grid with laser paths,
@@ -402,22 +383,15 @@ class LazorGame:
             current_laser = laser_queue.pop(0)  # Get the next laser to process
             laser_data = self.calculate_laser_path(self.grid, [current_laser])
 
-            # # Get positions and mark them on the grid
-            # for path in laser_data['positions']:
-            #     for (x, y) in path:
-            #         if self.grid.is_within_bounds(x, y):
-            #             # Add to hit points set
-            #             hit_points.add((x, y))
-                        
-            #             # Mark this position with 'L' if it's within grid bounds and not a fixed block
-            #             if self.grid.get_block(x, y).block_type == 'empty' or self.grid.get_block(x, y).block_type == 'none':
-            #                 self.grid.grid[y][x] = Block('laser', fixed=True)
+            for path in laser_data['positions']:
+                for (x, y) in path:
+                    if self.grid.is_within_bounds(x, y):
+                        # Add to hit points set
+                        hit_points.add((x, y))
 
-            # Add new lasers from refraction to the queue
             laser_queue.extend(laser_data['new_lasers'])
 
         return self.points.issubset(hit_points)
-
 
     def print_grid(self, grid):
         '''
@@ -522,7 +496,6 @@ class LazorGame:
         # Find all empty, movable positions in the grid
         available_positions = grid_obj.find_empty_positions()
         all_same_type = all(block.block_type == block_list[0].block_type for block in block_list)
-
         if all_same_type:
             # Use combinations if all blocks are of the same type
             block_positions = [
@@ -574,26 +547,21 @@ class LazorGame:
                 List of positions where each block should be placed.
         '''
         block_type_mapping = {'A': 'reflect', 'B': 'opaque', 'C': 'refract'}
-
         # Map available blocks to their types and place them in specified positions
         block_list = []
         for block_letter, count in self.available_blocks.items():
             actual_type = block_type_mapping.get(block_letter, 'empty')
             block_list.extend([actual_type] * count)
-        
         for position, block_type in zip(config, block_list):
             x, y = position
             self.grid.set_block(x, y, Block(block_type))
-            # print(f"Placed block '{block_type}' at position ({x}, {y})")
-            # print("\nUpdated Grid with Block and Laser Paths:")
-            # self.print_grid(self.grid.grid)
 
     def reset_lasers(self):
         '''
-        Calls the reset method on each laser to restore its initial state.
+        Resets the lasers to only the original lasers with their initial states.
         '''
-        for laser in self.lasers:
-            laser.reset()
+        self.lasers = [Laser(laser.x, laser.y, laser.vx, laser.vy) for laser in self.initial_lasers]
+
 
     def validate_solution(self):
         '''
@@ -618,7 +586,7 @@ class LazorGame:
         print("\nTarget points have been successfully intersected by lasers.")
 
 def main():
-    file_path = 'bff_files/mad_1.bff'
+    file_path = 'bff_files/yarn_5.bff'
     game = LazorGame(file_path)
     game.solve()
 
