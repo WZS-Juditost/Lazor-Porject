@@ -1,3 +1,7 @@
+import os
+import time
+import copy
+import itertools
 class Block:
     '''
     A class representing a block in the Lazors game grid.
@@ -140,7 +144,6 @@ class Laser:
         '''
         return (self.x, self.y)
 
-import copy
 class Grid:
     '''
     A class representing the game grid in the Lazors game.
@@ -322,7 +325,6 @@ def read_bff_file(file_path):
 
     return data
 
-import itertools
 class LazorGame:
     '''
     A class representing the Lazor Game, handling grid setup,
@@ -334,7 +336,8 @@ class LazorGame:
         Initializes the LazorGame with a parsed .bff file configuration.
 
         Args:
-            file_path (str): Path to the .bff file with game setup.
+            file_path (str): 
+                Path to the .bff file with game setup.
         '''
         # Read and parse data from the .bff file
         data = read_bff_file(file_path)
@@ -347,25 +350,6 @@ class LazorGame:
         self.solution_found = False
         self.initial_lasers = [Laser(laser.x, laser.y, laser.vx, laser.vy) for laser in data['lasers']]
 
-        # Print the loaded configuration for debugging purposes
-        print("=== Lazor Game Configuration ===")
-        print("\nGrid Layout:")
-        self.print_grid(self.grid.grid)
-        
-        print("\nLasers:")
-        for laser in self.lasers:
-            print(f"Position: ({laser.x}, {laser.y}), Direction: ({laser.vx}, {laser.vy})")
-        
-        print("\nTarget Points:")
-        for point in self.points:
-            print(f"Point: ({point[0]}, {point[1]})")
-
-        print("\nAvailable Blocks:")
-        for block_type, count in self.available_blocks.items():
-            print(f"Block Type '{block_type.upper()}': {count}")
-
-        print("\n++++++++++++++++++++++++++++++")
-
     def process_laser_paths(self, lasers):
         '''
         Calls laser_path for each laser and updates the grid with laser paths,
@@ -374,7 +358,7 @@ class LazorGame:
 
         Returns:
             bool: 
-                True if the solution is valid (all target points are hit), False otherwise.
+                True if the solution is valid, False otherwise.
         '''
         laser_queue = list(lasers)
         hit_points = set()
@@ -396,25 +380,43 @@ class LazorGame:
     def print_grid(self, grid):
         '''
         Prints the grid in a readable format, marking blocks and lasers appropriately.
+
+        Args:
+            grid (list of list of Block): 
+                A 2D list representing the game grid.
         '''
         for row in grid:
             row_repr = []
             for block in row:
                 if block.block_type == 'laser':
-                    row_repr.append('L')  # Laser path
+                    row_repr.append('L')
                 elif block.block_type == 'reflect':
-                    row_repr.append('A')  # Reflecting block
+                    row_repr.append('A')
                 elif block.block_type == 'opaque':
-                    row_repr.append('B')  # Opaque block
+                    row_repr.append('B')
                 elif block.block_type == 'refract':
-                    row_repr.append('C')  # Refracting block
+                    row_repr.append('C')
                 else:
-                    row_repr.append('.')  # Empty space
+                    row_repr.append('.')
             print(' '.join(row_repr))
 
     def calculate_laser_path(self, grid_obj, laser_objs):
         '''
         Traces the paths of lasers in the grid, updating positions based on interactions.
+
+        Args:
+            grid_obj (Grid): 
+                An instance of the Grid class, representing the current state of the game grid.
+            laser_objs (list of Laser): 
+                A list of Laser instances, each representing a laser with a starting position and direction.
+
+        Returns:
+            dict: 
+                A dictionary with positions and new_lasers:
+                    positions (list of list of tuple): 
+                        Each sublist represents the path taken by a laser in the grid.
+                    new_lasers (list of Laser): 
+                        A list of new Laser instances created by refraction.
         '''
         MAX_STEPS = 500
         positions = []
@@ -477,9 +479,9 @@ class LazorGame:
 
         return {'positions': positions, 'new_lasers': new_lasers}
     
-    def all_possible_positions(self, grid_obj, block_dict):
+    def all_possible_configs(self, grid_obj, block_dict):
         '''
-        Generates all possible positions for placing blocks on the grid.
+        Generates all possible configurations for placing blocks on the grid.
 
         Args:
             grid_obj (Grid): 
@@ -488,55 +490,53 @@ class LazorGame:
                 A dictionary with block types as keys and counts as values.
 
         Returns:
-            list of list of tuple: 
-                Each inner list contains tuples representing possible positions for each block in the block_dict.
+            block_configs (list of list of tuple): 
+                Each inner list contains tuples representing possible positions for each block.
         '''
         block_list = [Block(block_type) for block_type, count in block_dict.items() for _ in range(count)]
-
-        # Find all empty, movable positions in the grid
         available_positions = grid_obj.find_empty_positions()
         all_same_type = all(block.block_type == block_list[0].block_type for block in block_list)
         if all_same_type:
             # Use combinations if all blocks are of the same type
-            block_positions = [
+            block_configs = [
                 list(positions)
                 for positions in itertools.combinations(available_positions, len(block_list))
             ]
         else:
             # Use permutations if blocks are of different types
-            block_positions = [
+            block_configs = [
                 list(positions)
                 for positions in itertools.permutations(available_positions, len(block_list))
             ]
 
-        return block_positions
+        return block_configs
     
     def solve(self):
         '''
         Attempts to solve the puzzle by trying different block placements.
+        
+        Returns:
+            bool: 
+                True if a solution is found, False otherwise.
         '''
         # Generate all possible configurations of block placements
-        block_configurations = self.all_possible_positions(self.grid, self.available_blocks)
-        step=0
+        block_configurations = self.all_possible_configs(self.grid, self.available_blocks)
 
         for config in block_configurations:
-            step+=1
             self.place_blocks_in_grid(config)
 
             if self.process_laser_paths(self.lasers):
                 self.solution_found = True
                 print("Solution found!")
                 self.output_solution()
-                return
+                return True
 
-            # Reset the grid
+            # Reset the game
             self.grid.reset_to_initial()
             self.reset_lasers()
-        
-        print(step)
 
-        if not self.solution_found:
-            print("No solution found.")
+        print("No solution found.")
+        return False
 
     def place_blocks_in_grid(self, config):
         '''
@@ -568,7 +568,8 @@ class LazorGame:
         Checks if all target points are intersected by lasers.
 
         Returns:
-            bool: True if all points are intersected, False otherwise.
+            bool: 
+                True if all points are intersected, False otherwise.
         '''
         hit_points = set()
         for laser in self.lasers:
@@ -586,9 +587,66 @@ class LazorGame:
         print("\nTarget points have been successfully intersected by lasers.")
 
 def main():
-    file_path = 'bff_files/yarn_5.bff'
-    game = LazorGame(file_path)
-    game.solve()
+    print("Welcome to the Lazor Game Solver!")
+    print("=================================")
+    print("This tool attempts to find solutions for Lazor game puzzles defined in .bff files.")
+    print("You can either solve a single puzzle by specifying its file path or solve all puzzles in the 'bff_files' folder.")
+    print("Let's get started!\n")
+
+    user_input = input("Enter the path to the .bff file you want to solve, or press Enter to solve all examples in 'bff_files': ").strip()
+    total_time = 0
+    solved_files = 0
+
+    if user_input:
+        # Run solver on a specific file
+        if os.path.isfile(user_input) and user_input.endswith('.bff'):
+            print(f"\nAttempting to solve puzzle: {user_input}...")
+            start_time = time.time()
+
+            game = LazorGame(user_input)
+            solved = game.solve()  # Check if a solution was found
+
+            elapsed_time = time.time() - start_time
+            if solved:
+                total_time += elapsed_time
+                solved_files += 1
+                print(f"Time taken for {user_input}: {elapsed_time:.2f} seconds\n")
+            else:
+                print(f"Failed to solve {user_input}.")
+        else:
+            print("Invalid file path or file type. Please provide a valid .bff file.")
+            return
+    else:
+        # Run solver on all example files in the 'bff_files' directory
+        folder_path = 'bff_files'
+        print("Solving all puzzles in the 'bff_files' folder...")
+        for file_name in os.listdir(folder_path):
+            if file_name.endswith('.bff'):
+                file_path = os.path.join(folder_path, file_name)
+                print(f"\nProcessing puzzle: {file_name}...")
+
+                start_time = time.time()
+                
+                game = LazorGame(file_path)
+                solved = game.solve()
+
+                elapsed_time = time.time() - start_time
+                if solved:
+                    total_time += elapsed_time
+                    solved_files += 1
+                    print(f"Time taken for {file_name}: {elapsed_time:.2f} seconds")
+                else:
+                    print(f"Failed to solve {file_name}.")
+
+    # Final summary
+    print("\n=================================")
+    if solved_files > 0:
+        print(f"\nAll puzzles processed! Total puzzles solved: {solved_files}")
+        print(f"Total time taken to solve puzzles: {total_time:.2f} seconds")
+    else:
+        print("No puzzles were solved. Please ensure .bff files are available in the 'bff_files' folder.")
+    print("Thank you for using the Lazor Game Solver!")
+    print("=================================")
 
 if __name__ == '__main__':
     main()
