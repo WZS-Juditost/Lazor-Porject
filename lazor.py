@@ -942,7 +942,7 @@ def main():
     print("Let's get started!\n")
 
     user_input = input(
-        "Enter the path to the .bff file you want to solve,"
+        "Enter the path to the .bff file you want to solve, "
         "or press Enter to solve all examples in 'bff_files': "
     ).strip()
     total_time = 0
